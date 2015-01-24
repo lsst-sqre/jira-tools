@@ -37,16 +37,25 @@ def getEpicsPerWbsAndCycle(wbs, cycle):
     result = runJqlQuery(jql)
     return [issue['key'] for issue in result['issues']]
 
-def printEpic(epic, include_bugs):
-    estimated = noNone(getEpicEstimatedSps(epic))
-    planned = noNone(getEpicPlannedSps(epic, include_bugs))
-    completed = noNone(getEpicCompletedSps(epic, include_bugs))
-    print "Epic %s -- Estimated: %d, " % (epic, estimated),
-    print "Planned: %d, Completed: %d, " % (planned, completed),
-    print "Delta (Estimated-Planned): %d (%.1f%%), " % (estimated - planned, abs(100.0 * estimated - planned)/planned),
-    print "Delta (Planned-Completed): %d (%.1f%%)" % (planned - completed, abs(100.0 * planned-completed)/planned)
+def printEpicHeader():
+    print "         Estimated Planned Completed   Delta     Delta"
+    print "                                     (Est-Pla) (Pla-Cmp)"
 
-def summarizeWbsAndCycle(wbs, cycle, include_bugs):
+def printEpic(epic, include_bugs):
+    estimated = int(noNone(getEpicEstimatedSps(epic)))
+    planned = int(noNone(getEpicPlannedSps(epic, include_bugs)))
+    completed = int(noNone(getEpicCompletedSps(epic, include_bugs)))
+    template = "{id:>7}: {est:>{est_width}} {pl:>{pl_width}} {comp:>{comp_width}} {del1:>9} {del2:>9}"
+    print template.format(id=epic, est=estimated, pl=planned, comp=completed,
+                          del1=estimated-planned, del2=planned-completed,
+                          est_width=len("Estimated"), pl_width=len("Planned"), comp_width=len("Completed"))
+
+def printEpicStandalone(epic, include_bugs):
+    printEpicHeader()
+    printEpic(epic, include_bugs)
+
+def printSummary(wbs, cycle, include_bugs):
+    printEpicHeader()
     for epic in getEpicsPerWbsAndCycle(wbs, cycle):
         printEpic(epic, include_bugs)
 
@@ -58,12 +67,12 @@ if __name__ == "__main__":
 
     parser_epic = subparsers.add_parser('epic')
     parser_epic.add_argument('epic')
-    parser_epic.set_defaults(func=lambda args: printEpic(args.epic, args.include_bugs))
+    parser_epic.set_defaults(func=lambda args: printEpicStandalone(args.epic, args.include_bugs))
 
-    parser_wbs = subparsers.add_parser('wbs')
-    parser_wbs.add_argument('wbs')
-    parser_wbs.add_argument('cycle')
-    parser_wbs.set_defaults(func=lambda args: summarizeWbsAndCycle(args.wbs, args.cycle, args.include_bugs))
+    parser_summary = subparsers.add_parser('summary')
+    parser_summary.add_argument('wbs')
+    parser_summary.add_argument('cycle')
+    parser_summary.set_defaults(func=lambda args: printSummary(args.wbs, args.cycle, args.include_bugs))
 
     args = parser.parse_args()
     args.func(args)
