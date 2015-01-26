@@ -70,7 +70,10 @@ def printEpicStandalone(epic, allIssues):
     assigned = Counter()
     done = Counter()
     for issue in getIssuesInEpic(epic, allIssues):
-        assignee = issue['fields']['assignee']['displayName']
+        try:
+            assignee = issue['fields']['assignee']['displayName']
+        except TypeError:
+            assignee = "Not assigned"
         assigned[assignee] += int(noNone(issue['fields'][SP_FIELD]))
         if issue['fields']['status']['statusCategory']['name'] == 'Complete':
             done[assignee] += int(noNone(issue['fields'][SP_FIELD]))
