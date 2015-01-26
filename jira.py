@@ -38,26 +38,32 @@ def getEpicsPerWbsAndCycle(wbs, cycle):
     return [issue['key'] for issue in result['issues']]
 
 def printEpicHeader():
-    print "         Estimated Planned Completed   Delta     Delta"
-    print "                                     (Est-Pla) (Pla-Cmp)"
+    lines = [
+        ("       ", "Estimated", "Planned", "Completed", "  Delta  ", "  Delta  "),
+        ("       ", "         ", "       ", "         ", "(Est-Pla)", "(Pla-Cmp)")
+    ]
+    for line in lines:
+        print " ".join(line)
+    return [len(word) for word in lines[0]]
 
-def printEpic(epic, include_bugs):
+def printEpic(epic, widths, include_bugs):
     estimated = int(noNone(getEpicEstimatedSps(epic)))
     planned = int(noNone(getEpicPlannedSps(epic, include_bugs)))
     completed = int(noNone(getEpicCompletedSps(epic, include_bugs)))
-    template = "{id:>7}: {est:>{est_width}} {pl:>{pl_width}} {comp:>{comp_width}} {del1:>9} {del2:>9}"
+    template = "{id:>{w1}} {est:>{w2}} {pl:>{w3}} {comp:>{w4}} {del1:>{w5}} {del2:>{w6}}"
     print template.format(id=epic, est=estimated, pl=planned, comp=completed,
                           del1=estimated-planned, del2=planned-completed,
-                          est_width=len("Estimated"), pl_width=len("Planned"), comp_width=len("Completed"))
+                          w1=widths[0], w2=widths[1], w3=widths[2],
+                          w4=widths[3], w5=widths[4], w6=widths[5])
 
 def printEpicStandalone(epic, include_bugs):
-    printEpicHeader()
-    printEpic(epic, include_bugs)
+    field_widths = printEpicHeader()
+    printEpic(epic, field_widths, include_bugs)
 
 def printSummary(wbs, cycle, include_bugs):
-    printEpicHeader()
+    field_widths = printEpicHeader()
     for epic in getEpicsPerWbsAndCycle(wbs, cycle):
-        printEpic(epic, include_bugs)
+        printEpic(epic, field_widths, include_bugs)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
