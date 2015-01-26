@@ -6,12 +6,14 @@ Requires Python 2.7.x, Requests_.
 
 .. _Requests: http://docs.python-requests.org/en/latest/
 
-Get details for a single epic::
+Get details including a breakdown of assignees for a single epic::
 
    $ ./jira.py epic DM-1101
            Estimated Planned Completed   Delta     Delta
                                        (Est-Pla) (Pla-Cmp)
    DM-1101        51      55        45        -4        10
+                          14         5 Developer X
+                          41        26 Developer Y
 
 Get a summary of all epics for a given WBS and cycle::
 
@@ -27,4 +29,10 @@ Note that the WBS matches anything beginning with the string given; thus,
 
 By default, only issues of type "story" are counted when calculating planned
 and completed story points. To include other issue types (bug, improvement),
-use the ``--all-issuess`` command line option.
+use the ``--all-issues`` command line option.
+
+In general, we assume that setting an issue to a status of "Won't Fix" is
+equivalent to deleting it: such issues are excluded from counts of planned or
+compelted story points. The ``--wontfix-is-done`` command line option changes
+this so that issues marked as "Won't Fix" are counted in exactly the same way
+as issues marked as done.

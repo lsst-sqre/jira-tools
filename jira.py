@@ -16,6 +16,14 @@ def eligibleIssues(allIssues):
     else:
         return 'story'
 
+def isComplete(issue):
+    if issue['fields']['status']['statusCategory']['name'] == 'Complete':
+        return True
+    return False
+
+def excludeWontFix(issues):
+    return [issue for issue in issues if issue['fields']['status']['name'] != 'Won\'t Fix']
+
 def runJqlQuery(jql, **kwargs):
     SEARCH_URL = "https://jira.lsstcorp.org/rest/api/2/search"
     return requests.get(SEARCH_URL, params={"jql": jql.format(**kwargs)}).json()
@@ -26,19 +34,21 @@ def getEpicById(issue):
 def getEpicEstimatedSps(issue):
     return getEpicById(issue)['fields'][SP_FIELD]
 
-def getIssuesInEpic(issue, allIssues):
+def getIssuesInEpic(issue, args):
     jql = '"Epic Link" = {id} AND issuetype IN ({types})'
-    result = runJqlQuery(jql, id=issue, types=eligibleIssues(allIssues))
-    return result['issues']
+    result = runJqlQuery(jql, id=issue, types=eligibleIssues(args.all_issues))
+    if not args.wontfix_is_done:
+        return excludeWontFix(result['issues'])
+    else:
+        return result['issues']
 
-def getEpicPlannedSps(issue, allIssues):
-    issues = getIssuesInEpic(issue, allIssues)
+def getEpicPlannedSps(issue, args):
+    issues = getIssuesInEpic(issue, args)
     return sum(noNone(issue['fields'][SP_FIELD]) for issue in issues)
 
-def getEpicCompletedSps(issue, allIssues):
-    issues = getIssuesInEpic(issue, allIssues)
-    return sum(noNone(issue['fields'][SP_FIELD]) for issue in issues
-               if issue['fields']['status']['statusCategory']['name'] == 'Complete')
+def getEpicCompletedSps(issue, args):
+    issues = getIssuesInEpic(issue, args)
+    return sum(noNone(issue['fields'][SP_FIELD]) for issue in issues if isComplete(issue))
 
 def getEpicsPerWbsAndCycle(wbs, cycle):
     jql = 'issuetype = Epic AND WBS ~ "{wbs}*" AND cycle = "{cycle}" ORDER BY Id'
@@ -54,53 +64,54 @@ def printEpicHeader():
         print " ".join(line)
     return [len(word) for word in lines[0]]
 
-def printEpic(epic, widths, allIssues):
+def printEpic(epic, widths, args):
     estimated = int(noNone(getEpicEstimatedSps(epic)))
-    planned = int(noNone(getEpicPlannedSps(epic, allIssues)))
-    completed = int(noNone(getEpicCompletedSps(epic, allIssues)))
+    planned = int(noNone(getEpicPlannedSps(epic, args)))
+    completed = int(noNone(getEpicCompletedSps(epic, args)))
     template = "{id:>{w1}} {est:>{w2}} {pl:>{w3}} {comp:>{w4}} {del1:>{w5}} {del2:>{w6}}"
     print template.format(id=epic, est=estimated, pl=planned, comp=completed,
                           del1=estimated-planned, del2=planned-completed,
                           w1=widths[0], w2=widths[1], w3=widths[2],
                           w4=widths[3], w5=widths[4], w6=widths[5])
 
-def printEpicStandalone(epic, allIssues):
+def printEpicStandalone(args):
     field_widths = printEpicHeader()
-    printEpic(epic, field_widths, allIssues)
+    printEpic(args.epic, field_widths, args)
     assigned = Counter()
     done = Counter()
-    for issue in getIssuesInEpic(epic, allIssues):
+    for issue in getIssuesInEpic(args.epic, args):
         try:
             assignee = issue['fields']['assignee']['displayName']
         except TypeError:
             assignee = "Not assigned"
         assigned[assignee] += int(noNone(issue['fields'][SP_FIELD]))
-        if issue['fields']['status']['statusCategory']['name'] == 'Complete':
+        if isComplete(issue):
             done[assignee] += int(noNone(issue['fields'][SP_FIELD]))
     for assignee in assigned.keys():
         print "{s:>{w1}}{assigned:>{w2}} {done:>{w3}} {name}".format(
             s=" ", assigned=assigned[assignee], done=done[assignee], name=assignee,
             w1=field_widths[0]+field_widths[1], w2=field_widths[3], w3=field_widths[4])
 
-def printSummary(wbs, cycle, allIssues):
+def printSummary(args):
     field_widths = printEpicHeader()
-    for epic in getEpicsPerWbsAndCycle(wbs, cycle):
-        printEpic(epic, field_widths, allIssues)
+    for epic in getEpicsPerWbsAndCycle(args.wbs, args.cycle):
+        printEpic(epic, field_widths, args)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--all-issues", action="store_true")
+    parser.add_argument("--wontfix-is-done", action="store_true")
 
     subparsers = parser.add_subparsers()
 
     parser_epic = subparsers.add_parser('epic')
     parser_epic.add_argument('epic')
-    parser_epic.set_defaults(func=lambda args: printEpicStandalone(args.epic, args.all_issues))
+    parser_epic.set_defaults(func=printEpicStandalone)
 
     parser_summary = subparsers.add_parser('summary')
     parser_summary.add_argument('wbs')
     parser_summary.add_argument('cycle')
-    parser_summary.set_defaults(func=lambda args: printSummary(args.wbs, args.cycle, args.all_issues))
+    parser_summary.set_defaults(func=printSummary)
 
     args = parser.parse_args()
     args.func(args)
