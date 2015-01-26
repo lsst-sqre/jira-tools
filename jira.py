@@ -7,34 +7,34 @@ SP_FIELD = "customfield_10202" # story points, as established by experiment
 def noNone(s):
     return 0 if s is None else s
 
-def eligibleIssues(include_bugs):
-    if include_bugs:
-        return "story, bug, improvement"
+def eligibleIssues(includeBugs):
+    if includeBugs:
+        return 'story, bug, improvement'
     else:
-        return "story"
+        return 'story'
 
-def runJqlQuery(jql):
+def runJqlQuery(jql, **kwargs):
     SEARCH_URL = "https://jira.lsstcorp.org/rest/api/2/search"
-    return requests.get(SEARCH_URL, params={"jql": jql}).json()
+    return requests.get(SEARCH_URL, params={"jql": jql.format(**kwargs)}).json()
 
 def getEpicEstimatedSps(issue):
-    jql = "id = %s" % (issue,)
-    result = runJqlQuery(jql)
+    jql = 'id = {id}'
+    result = runJqlQuery(jql, id=issue)
     return result['issues'][0]['fields'][SP_FIELD]
 
-def getEpicPlannedSps(issue, include_bugs):
-    jql = "\"Epic Link\" = %s AND issuetype IN (%s)" % (issue, eligibleIssues(include_bugs))
-    result = runJqlQuery(jql)
+def getEpicPlannedSps(issue, includeBugs):
+    jql = '"Epic Link" = {id} AND issuetype IN ({types})'
+    result = runJqlQuery(jql, id=issue, types=eligibleIssues(includeBugs))
     return sum(noNone(issue['fields'][SP_FIELD]) for issue in result['issues'])
 
-def getEpicCompletedSps(issue, include_bugs):
-    jql = "\"Epic Link\" = %s AND statusCategory = Complete AND issuetype in (%s)" % (issue, eligibleIssues(include_bugs))
-    result = runJqlQuery(jql)
+def getEpicCompletedSps(issue, includeBugs):
+    jql = '"Epic Link" = {id} AND statusCategory = Complete AND issuetype in ({types})'
+    result = runJqlQuery(jql, id=issue, types=eligibleIssues(includeBugs))
     return sum(noNone(issue['fields'][SP_FIELD]) for issue in result['issues'])
 
 def getEpicsPerWbsAndCycle(wbs, cycle):
-    jql = "issuetype = Epic AND cycle = \"%s\" AND WBS ~ \"%s*\" ORDER BY Id" % (cycle, wbs)
-    result = runJqlQuery(jql)
+    jql = 'issuetype = Epic AND WBS ~ "{wbs}*" AND cycle = "{cycle}" ORDER BY Id'
+    result = runJqlQuery(jql, wbs=wbs, cycle=cycle)
     return [issue['key'] for issue in result['issues']]
 
 def printEpicHeader():
@@ -46,24 +46,24 @@ def printEpicHeader():
         print " ".join(line)
     return [len(word) for word in lines[0]]
 
-def printEpic(epic, widths, include_bugs):
+def printEpic(epic, widths, includeBugs):
     estimated = int(noNone(getEpicEstimatedSps(epic)))
-    planned = int(noNone(getEpicPlannedSps(epic, include_bugs)))
-    completed = int(noNone(getEpicCompletedSps(epic, include_bugs)))
+    planned = int(noNone(getEpicPlannedSps(epic, includeBugs)))
+    completed = int(noNone(getEpicCompletedSps(epic, includeBugs)))
     template = "{id:>{w1}} {est:>{w2}} {pl:>{w3}} {comp:>{w4}} {del1:>{w5}} {del2:>{w6}}"
     print template.format(id=epic, est=estimated, pl=planned, comp=completed,
                           del1=estimated-planned, del2=planned-completed,
                           w1=widths[0], w2=widths[1], w3=widths[2],
                           w4=widths[3], w5=widths[4], w6=widths[5])
 
-def printEpicStandalone(epic, include_bugs):
+def printEpicStandalone(epic, includeBugs):
     field_widths = printEpicHeader()
-    printEpic(epic, field_widths, include_bugs)
+    printEpic(epic, field_widths, includeBugs)
 
-def printSummary(wbs, cycle, include_bugs):
+def printSummary(wbs, cycle, includeBugs):
     field_widths = printEpicHeader()
     for epic in getEpicsPerWbsAndCycle(wbs, cycle):
-        printEpic(epic, field_widths, include_bugs)
+        printEpic(epic, field_widths, includeBugs)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
