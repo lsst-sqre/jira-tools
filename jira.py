@@ -3,6 +3,7 @@
 import argparse
 import sys
 import requests
+from collections import Counter
 
 SP_FIELD = "customfield_10202" # story points, as established by experiment
 
@@ -19,20 +20,25 @@ def runJqlQuery(jql, **kwargs):
     SEARCH_URL = "https://jira.lsstcorp.org/rest/api/2/search"
     return requests.get(SEARCH_URL, params={"jql": jql.format(**kwargs)}).json()
 
-def getEpicEstimatedSps(issue):
-    jql = 'id = {id}'
-    result = runJqlQuery(jql, id=issue)
-    return result['issues'][0]['fields'][SP_FIELD]
+def getEpicById(issue):
+    return runJqlQuery('id = {id}', id=issue)['issues'][0]
 
-def getEpicPlannedSps(issue, allIssues):
+def getEpicEstimatedSps(issue):
+    return getEpicById(issue)['fields'][SP_FIELD]
+
+def getIssuesInEpic(issue, allIssues):
     jql = '"Epic Link" = {id} AND issuetype IN ({types})'
     result = runJqlQuery(jql, id=issue, types=eligibleIssues(allIssues))
-    return sum(noNone(issue['fields'][SP_FIELD]) for issue in result['issues'])
+    return result['issues']
+
+def getEpicPlannedSps(issue, allIssues):
+    issues = getIssuesInEpic(issue, allIssues)
+    return sum(noNone(issue['fields'][SP_FIELD]) for issue in issues)
 
 def getEpicCompletedSps(issue, allIssues):
-    jql = '"Epic Link" = {id} AND statusCategory = Complete AND issuetype in ({types})'
-    result = runJqlQuery(jql, id=issue, types=eligibleIssues(allIssues))
-    return sum(noNone(issue['fields'][SP_FIELD]) for issue in result['issues'])
+    issues = getIssuesInEpic(issue, allIssues)
+    return sum(noNone(issue['fields'][SP_FIELD]) for issue in issues
+               if issue['fields']['status']['statusCategory']['name'] == 'Complete')
 
 def getEpicsPerWbsAndCycle(wbs, cycle):
     jql = 'issuetype = Epic AND WBS ~ "{wbs}*" AND cycle = "{cycle}" ORDER BY Id'
@@ -61,6 +67,17 @@ def printEpic(epic, widths, allIssues):
 def printEpicStandalone(epic, allIssues):
     field_widths = printEpicHeader()
     printEpic(epic, field_widths, allIssues)
+    assigned = Counter()
+    done = Counter()
+    for issue in getIssuesInEpic(epic, allIssues):
+        assignee = issue['fields']['assignee']['displayName']
+        assigned[assignee] += int(noNone(issue['fields'][SP_FIELD]))
+        if issue['fields']['status']['statusCategory']['name'] == 'Complete':
+            done[assignee] += int(noNone(issue['fields'][SP_FIELD]))
+    for assignee in assigned.keys():
+        print "{s:>{w1}}{assigned:>{w2}} {done:>{w3}} {name}".format(
+            s=" ", assigned=assigned[assignee], done=done[assignee], name=assignee,
+            w1=field_widths[0]+field_widths[1], w2=field_widths[3], w3=field_widths[4])
 
 def printSummary(wbs, cycle, allIssues):
     field_widths = printEpicHeader()
