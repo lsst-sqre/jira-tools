@@ -42,13 +42,8 @@ def getIssuesInEpic(issue, args):
     else:
         return result['issues']
 
-def getEpicPlannedSps(issue, args):
-    issues = getIssuesInEpic(issue, args)
+def sumStoryPoints(issues):
     return sum(noNone(issue['fields'][SP_FIELD]) for issue in issues)
-
-def getEpicCompletedSps(issue, args):
-    issues = getIssuesInEpic(issue, args)
-    return sum(noNone(issue['fields'][SP_FIELD]) for issue in issues if isComplete(issue))
 
 def getEpicsPerWbsAndCycle(wbs, cycle):
     jql = 'issuetype = Epic AND WBS ~ "{wbs}*" AND cycle = "{cycle}" ORDER BY Id'
@@ -66,8 +61,9 @@ def printEpicHeader():
 
 def printEpic(epic, widths, args):
     estimated = int(noNone(getEpicEstimatedSps(epic)))
-    planned = int(noNone(getEpicPlannedSps(epic, args)))
-    completed = int(noNone(getEpicCompletedSps(epic, args)))
+    issues = getIssuesInEpic(epic, args)
+    planned = int(sumStoryPoints(issues))
+    completed = int(sumStoryPoints(issue for issue in issues if isComplete(issue)))
     template = "{id:>{w1}} {est:>{w2}} {pl:>{w3}} {comp:>{w4}} {del1:>{w5}} {del2:>{w6}}"
     print template.format(id=epic, est=estimated, pl=planned, comp=completed,
                           del1=estimated-planned, del2=planned-completed,
