@@ -33,6 +33,6 @@ use the ``--all-issues`` command line option.
 
 In general, we assume that setting an issue to a status of "Won't Fix" is
 equivalent to deleting it: such issues are excluded from counts of planned or
-compelted story points. The ``--wontfix-is-done`` command line option changes
+completed story points. The ``--wontfix-is-done`` command line option changes
 this so that issues marked as "Won't Fix" are counted in exactly the same way
 as issues marked as done.
