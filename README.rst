@@ -17,7 +17,7 @@ Get details including a breakdown of assignees for a single epic::
 
 Get a summary of all epics for a given WBS and cycle::
 
-   $ ./jira.py summary 02C.04 "Winter 2015"
+   $ ./jira.py summary 02C.04 --cycle="Winter 2015"
            Estimated Planned Completed   Delta     Delta
                                        (Est-Pla) (Pla-Cmp)
      DM-85        31      31         0         0        31
@@ -26,6 +26,8 @@ Get a summary of all epics for a given WBS and cycle::
 
 Note that the WBS matches anything beginning with the string given; thus,
 ``02C.04`` retrieves epics with a WBS of ``02C.04.01``, ``02C.04.02``, etc.
+Specifying the cycle is optional: if not set, all epics will be shown
+regardless of cycle.
 
 By default, only issues of type "story" are counted when calculating planned
 and completed story points. To include other issue types (bug, improvement),
