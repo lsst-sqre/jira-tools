@@ -5,7 +5,9 @@ import sys
 import requests
 from collections import Counter
 
-SP_FIELD = "customfield_10202" # story points, as established by experiment
+# Custom field names, as established by experiment
+SP_FIELD = "customfield_10202"    # story points
+CYCLE_FIELD = "customfield_10501" # cycle
 
 def noNone(s):
     return 0 if s is None else s
@@ -46,9 +48,12 @@ def sumStoryPoints(issues):
     return sum(noNone(issue['fields'][SP_FIELD]) for issue in issues)
 
 def getEpicsPerWbsAndCycle(wbs, cycle):
-    jql = 'issuetype = Epic AND WBS ~ "{wbs}*" AND cycle = "{cycle}" ORDER BY Id'
-    result = runJqlQuery(jql, wbs=wbs, cycle=cycle)
-    return [issue['key'] for issue in result['issues']]
+    jql = 'issuetype = Epic AND WBS ~ "{wbs}*" ORDER BY Id'
+    result = runJqlQuery(jql, wbs=wbs)
+    # Filtering client-side means tranferring more data, but is unlikely to be
+    # a significant performance hit unless the number of epics is huge.
+    return [issue['key'] for issue in result['issues'] if cycle is None
+            or (issue['fields'][CYCLE_FIELD] and issue['fields'][CYCLE_FIELD]['value'] == cycle)]
 
 def printEpicHeader():
     lines = [
@@ -105,8 +110,8 @@ if __name__ == "__main__":
     parser_epic.set_defaults(func=printEpicStandalone)
 
     parser_summary = subparsers.add_parser('summary')
+    parser_summary.add_argument("--cycle", default=None)
     parser_summary.add_argument('wbs')
-    parser_summary.add_argument('cycle')
     parser_summary.set_defaults(func=printSummary)
 
     args = parser.parse_args()
