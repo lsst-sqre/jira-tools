@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import re
 import sys
 import requests
 from collections import Counter
@@ -30,11 +31,11 @@ def runJqlQuery(jql, **kwargs):
     SEARCH_URL = "https://jira.lsstcorp.org/rest/api/2/search"
     return requests.get(SEARCH_URL, params={"jql": jql.format(**kwargs)}).json()
 
-def getEpicById(issue):
-    return runJqlQuery('id = {id}', id=issue)['issues'][0]
+def getIssueById(issueId):
+    return runJqlQuery('id = {id}', id=issueId)['issues'][0]
 
 def getEpicEstimatedSps(issue):
-    return getEpicById(issue)['fields'][SP_FIELD]
+    return getIssueById(issue)['fields'][SP_FIELD]
 
 def getIssuesInEpic(issue, args):
     jql = '"Epic Link" = {id} AND issuetype IN ({types})'
@@ -46,6 +47,17 @@ def getIssuesInEpic(issue, args):
 
 def sumStoryPoints(issues):
     return sum(noNone(issue['fields'][SP_FIELD]) for issue in issues)
+
+def getWorkBreakdown(epicId):
+    issue = getIssueById(epicId)
+    # Does the epic contain a breakdown line? If not, return None.
+    breakdown = re.search(r"Breakdown:.*$", issue['fields']['description'])
+    # Quick & dirty loop should probably be a comprehension
+    values = {}
+    if breakdown:
+        for item in re.compile(r"(\w+ ?\d+)%;?").findall(issue['fields']['description'], breakdown.start(), breakdown.end()):
+            values[item.split()[0]] = float(item.split()[1]) / 100.0
+    return values
 
 def getEpicsPerWbsAndCycle(wbs, cycle):
     jql = 'issuetype = Epic AND WBS ~ "{wbs}*" ORDER BY Id'
@@ -74,24 +86,28 @@ def printEpic(epic, widths, args):
                           del1=estimated-planned, del2=planned-completed,
                           w1=widths[0], w2=widths[1], w3=widths[2],
                           w4=widths[3], w5=widths[4], w6=widths[5])
+    return (estimated, planned, completed)
 
 def printEpicStandalone(args):
     field_widths = printEpicHeader()
-    printEpic(args.epic, field_widths, args)
+    estSp, planSp, compSp = printEpic(args.epic, field_widths, args)
+    estimated = Counter()
     assigned = Counter()
     done = Counter()
+    for assignee, percentage in getWorkBreakdown(args.epic).iteritems():
+        estimated[assignee] = int(round(estSp * percentage))
     for issue in getIssuesInEpic(args.epic, args):
         try:
-            assignee = issue['fields']['assignee']['displayName']
+            assignee = issue['fields']['assignee']['name']
         except TypeError:
             assignee = "Not assigned"
         assigned[assignee] += int(noNone(issue['fields'][SP_FIELD]))
         if isComplete(issue):
             done[assignee] += int(noNone(issue['fields'][SP_FIELD]))
-    for assignee in assigned.keys():
-        print "{s:>{w1}}{assigned:>{w2}} {done:>{w3}} {name}".format(
-            s=" ", assigned=assigned[assignee], done=done[assignee], name=assignee,
-            w1=field_widths[0]+field_widths[1], w2=field_widths[3], w3=field_widths[4])
+    for assignee in set(assigned.keys() + estimated.keys()):
+        print "{s:>{w1}} {estimated:>{w2}} {assigned:>{w3}} {done:>{w4}} {name}".format(
+            s=" ", estimated=estimated[assignee], assigned=assigned[assignee], done=done[assignee], name=assignee,
+            w1=field_widths[0], w2=field_widths[1], w3=field_widths[2], w4=field_widths[3])
 
 def printSummary(args):
     field_widths = printEpicHeader()
