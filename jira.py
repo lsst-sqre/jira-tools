@@ -51,7 +51,7 @@ def sumStoryPoints(issues):
 def getWorkBreakdown(epicId):
     issue = getIssueById(epicId)
     # Does the epic contain a breakdown line? If not, return None.
-    breakdown = re.search(r"Breakdown:.*$", issue['fields']['description'])
+    breakdown = re.search(r"Breakdown:.*\n?", issue['fields']['description'])
     # Quick & dirty loop should probably be a comprehension
     values = {}
     if breakdown:
@@ -69,8 +69,8 @@ def getEpicsPerWbsAndCycle(wbs, cycle):
 
 def printEpicHeader():
     lines = [
-        ("       ", "Estimated", "Planned", "Completed", "  Delta  ", "  Delta  "),
-        ("       ", "         ", "       ", "         ", "(Est-Pla)", "(Pla-Cmp)")
+        ("        ", "Estimated", "Planned", "Completed", "  Delta  ", "  Delta  "),
+        ("        ", "         ", "       ", "         ", "(Est-Pla)", "(Pla-Cmp)")
     ]
     for line in lines:
         print " ".join(line)
@@ -111,8 +111,14 @@ def printEpicStandalone(args):
 
 def printSummary(args):
     field_widths = printEpicHeader()
+    estimated = Counter()
     for epic in getEpicsPerWbsAndCycle(args.wbs, args.cycle):
-        printEpic(epic, field_widths, args)
+        estSp, planSp, compSp = printEpic(epic, field_widths, args)
+        for assignee, percentage in getWorkBreakdown(epic).iteritems():
+            estimated[assignee] += int(round(estSp * percentage))
+    print
+    for assignee, sps in estimated.iteritems():
+        print "{assignee:>{w1}} {sps:>{w2}}".format(assignee=assignee, sps=sps, w1=field_widths[0], w2=field_widths[1])
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

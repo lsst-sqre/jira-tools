@@ -24,6 +24,14 @@ Get a summary of all epics for a given WBS and cycle::
    DM-1074        20      11         1         9        10
    [etc]
 
+The summary will also print the number of story points estimated per user if
+and only if the epic descriptions contain a line formatted like::
+
+   Breakdown: ${username1} XX%; ${username2} YY%
+
+No attempt is currently made to ensure the percentages sum to 100, or that the
+usernames are valid.
+
 Note that the WBS matches anything beginning with the string given; thus,
 ``02C.04`` retrieves epics with a WBS of ``02C.04.01``, ``02C.04.02``, etc.
 Specifying the cycle is optional: if not set, all epics will be shown
