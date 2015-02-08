@@ -49,15 +49,14 @@ def sumStoryPoints(issues):
     return sum(noNone(issue['fields'][SP_FIELD]) for issue in issues)
 
 def getWorkBreakdown(epicId):
-    issue = getIssueById(epicId)
+    description = getIssueById(epicId)['fields']['description'] or ""
     # Does the epic contain a breakdown line? If not, return None.
-    breakdown = re.search(r"Breakdown:.*\n?", issue['fields']['description'])
-    # Quick & dirty loop should probably be a comprehension
-    values = {}
-    if breakdown:
-        for item in re.compile(r"(\w+ ?\d+)%;?").findall(issue['fields']['description'], breakdown.start(), breakdown.end()):
-            values[item.split()[0]] = float(item.split()[1]) / 100.0
-    return values
+    bdown = re.search(r"^Breakdown:.*$", description, re.MULTILINE)
+    if bdown:
+        return {item.split()[0] : float(item.split()[1]) / 100.0
+                for item in re.compile(r"(\w+ ?\d+)%;?").findall(description, bdown.start(), bdown.end())}
+    else:
+        return {}
 
 def getEpicsPerWbsAndCycle(wbs, cycle):
     jql = 'issuetype = Epic AND WBS ~ "{wbs}*" ORDER BY Id'
