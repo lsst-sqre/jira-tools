@@ -7,8 +7,9 @@ import requests
 from collections import Counter
 
 # Custom field names, as established by experiment
-SP_FIELD = "customfield_10202"    # story points
-CYCLE_FIELD = "customfield_10501" # cycle
+SP_FIELD      = "customfield_10202" # story points
+CYCLE_FIELD   = "customfield_10501" # cycle
+SUMMARY_FIELD = "customfield_10207" # epic summary
 
 def noNone(s):
     return 0 if s is None else s
@@ -29,13 +30,17 @@ def excludeWontFix(issues):
 
 def runJqlQuery(jql, **kwargs):
     SEARCH_URL = "https://jira.lsstcorp.org/rest/api/2/search"
-    return requests.get(SEARCH_URL, params={"jql": jql.format(**kwargs)}).json()
+    MAX_RESULTS = 10000 # May be limited server-side
+    return requests.get(SEARCH_URL, params={"maxResults": MAX_RESULTS, "jql": jql.format(**kwargs)}).json()
 
 def getIssueById(issueId):
     return runJqlQuery('id = {id}', id=issueId)['issues'][0]
 
-def getEpicEstimatedSps(issue):
-    return getIssueById(issue)['fields'][SP_FIELD]
+def getEpicEstimatedSps(epic):
+    return epic['fields'][SP_FIELD]
+
+def getEpicSummary(epic):
+    return epic['fields'][SUMMARY_FIELD]
 
 def getIssuesInEpic(issue, args):
     jql = '"Epic Link" = {id} AND issuetype IN ({types})'
@@ -75,14 +80,16 @@ def printEpicHeader():
         print " ".join(line)
     return [len(word) for word in lines[0]]
 
-def printEpic(epic, widths, args):
+def printEpic(epicId, widths, args):
+    epic = getIssueById(epicId)
     estimated = int(noNone(getEpicEstimatedSps(epic)))
-    issues = getIssuesInEpic(epic, args)
+    summary = getEpicSummary(epic)
+    issues = getIssuesInEpic(epicId, args)
     planned = int(sumStoryPoints(issues))
     completed = int(sumStoryPoints(issue for issue in issues if isComplete(issue)))
-    template = "{id:>{w1}} {est:>{w2}} {pl:>{w3}} {comp:>{w4}} {del1:>{w5}} {del2:>{w6}}"
-    print template.format(id=epic, est=estimated, pl=planned, comp=completed,
-                          del1=estimated-planned, del2=planned-completed,
+    template = "{id:>{w1}} {est:>{w2}} {pl:>{w3}} {comp:>{w4}} {del1:>{w5}} {del2:>{w6}} {desc}"
+    print template.format(id=epicId, est=estimated, pl=planned, comp=completed,
+                          del1=estimated-planned, del2=planned-completed, desc=summary,
                           w1=widths[0], w2=widths[1], w3=widths[2],
                           w4=widths[3], w5=widths[4], w6=widths[5])
     return (estimated, planned, completed)
