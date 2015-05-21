@@ -8,7 +8,7 @@ from collections import Counter
 
 # Custom field names, as established by experiment
 SP_FIELD      = "customfield_10202" # story points
-CYCLE_FIELD   = "customfield_10501" # cycle
+CYCLE_FIELD   = "customfield_10900" # cycle
 SUMMARY_FIELD = "customfield_10207" # epic summary
 
 def noNone(s):
